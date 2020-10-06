@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-数据预处理总入口
-@author ccieailab
+Q-learning 爬楼梯
+@author cqcet ailab
 """
 
 import numpy as np
@@ -42,17 +42,17 @@ def setup_q_table(states, behaviors):
 
 
 def choose_next_behavior(state, q_table):
-    state_actions = q_table.iloc[state, :]
-    state_action_random = (state_actions == 0).all()
+    state_behavior = q_table.iloc[state, :]
+    state_behavior_random = (state_behavior == 0).all()
     epsilon_random = np.random.uniform() < EPSILON
-    random_choose = state_action_random or epsilon_random < EPSILON
+    random_choose = state_behavior_random or epsilon_random < EPSILON
     if random_choose:
-        next_action = np.random.choice(BEHAVIORS)
+        next_behavior = np.random.choice(BEHAVIORS)
     else:
-        next_action = state_actions.idxmax()
+        next_behavior = state_behavior.idxmax()
     print('state is {}, state_actions is \r{}\rfinal choose next behavior {}(state_action_random {} epsilon_random {})'.
-          format(state, state_actions, next_action, state_action_random, epsilon_random))
-    return next_action
+          format(state, state_behavior, next_behavior, state_behavior_random, epsilon_random))
+    return next_behavior
 
 
 def do_climb_behavior(state, behavior):
@@ -106,7 +106,7 @@ def print_ladder_state(cur_state):
         print('{:2} {:2}'.format(element, 'O' if index == cur_state else ' '))
 
 
-def reinforcement_learning_main():
+def reinforcement_q_learning_main():
     q_table = setup_q_table(len(LADDER_ARR), BEHAVIORS)
     for episode_index in range(MAX_EPISODE):
         print('-------episode:{} start----------'.format(episode_index))
@@ -118,7 +118,7 @@ def reinforcement_learning_main():
 
 
 if __name__ == "__main__":
-    q_table = reinforcement_learning_main()
+    q_table = reinforcement_q_learning_main()
     print('-------final----------')
     print(q_table)
     print('----------------------')
