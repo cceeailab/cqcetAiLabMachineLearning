@@ -26,7 +26,7 @@ class BehaviorsType(IntEnum):
 
 
 # 最多实验的次数
-MAX_EPISODE = 50
+MAX_EPISODE = 25
 # 随机行为发生的概率
 EPSILON = 0.1
 # 学习率，这个值越高，表示越会参考之前获得的经验
@@ -58,22 +58,19 @@ class Map_Node:
 
 def setup_labyrinth_map():
     """
-    ○(0)  -   ○(1)  -   ○(2)  -   ○(3)  -  ○(4)
-      |         |          |         |         |
-    ○(5)  -   ○(6)  -   ○(7)  -   ○(8)  -  ○(9)
-      |         |          |         |         |
-    ☼(10)  -  ○(11)  -  ○(12)  -  ☼(13)  - ○(14)
-      |         |          |         |         |
-    ○(15)  -  ○(16)  -  ☼(17)  -  ※(18)  - ○(19)
-      |         |          |         |         |
-    ○(20)  -  ○(21)  -  ○(22)  -  ○(23)  - ○(24)
+    ○(0)  -   ○(1)  -   ○(2)  -   ○(3)
+      |         |          |         |
+    ○(4)  -   ○(5)  -   ○(6)  -   ○(7)
+      |         |          |         |
+    ○(8)  -   ○(9)  -  X(10)  -  ○(11)
+      |         |          |         |
+    X(12)  - X(13) -   ※(14)  -  ○(15)
     :return:
     """
-    map_array = np.array([(0, 0, 0, 0, 0),
-                          (0, 0, 0, 0, 0),
-                          (2, 0, 0, 2, 0),
-                          (0, 0, 2, 1, 0),
-                          (0, 0, 0, 0, 0)
+    map_array = np.array([(0, 0, 0, 0),
+                          (0, 0, 0, 0),
+                          (0, 0, 2, 0),
+                          (2, 2, 1, 0),
                           ])
 
     map_dic = dict()
@@ -90,7 +87,7 @@ def setup_labyrinth_map():
                                            map_array[row][line],
                                            '○' if map_array[row][line] == MapNodeType.ground else
                                            '※' if map_array[row][line] == MapNodeType.treasure else
-                                           '☼')
+                                           'X')
     print_labyrinth_state(map_dic, 0)
     return map_dic
 
@@ -122,42 +119,49 @@ def choose_next_behavior(labyrinth_map, q_table, node):
     state_behavior = q_table.loc[node, :]
     neighbor_nodes = labyrinth_map[node].neighbor_nodes
     options_dir = [index for index, node in enumerate(neighbor_nodes) if node != -1]
+    options_value = [value for value, node in zip(state_behavior, neighbor_nodes) if node != -1]
+
     random_choose = np.random.uniform() < EPSILON
     if random_choose:
         next_behavior = np.random.choice(options_dir)
     else:
-        max_target_dirs = [x for x in options_dir if state_behavior[x] == np.max(state_behavior)]
-        next_behavior = np.random.choice(max_target_dirs)
-    next_node = labyrinth_map[neighbor_nodes[next_behavior]]
-    reward = 1 if next_node.is_treasure_node() else -1 if next_node.is_trap_node() else 0
-    return next_behavior, next_node, reward
+        options_act = [x for x in options_dir if state_behavior[x] == np.max(options_value)]
+        next_behavior = np.random.choice(options_act)
+    return next_behavior
 
 
 def process_explore_labyrinth(labyrinth_map, q_table):
     node_list = [0]
     is_reach_end = False
+    next_behavior = choose_next_behavior(labyrinth_map, q_table, labyrinth_map[0].index)
     while not is_reach_end:
         cur_node = labyrinth_map[node_list[-1]]
-        next_behavior, next_node, reward = choose_next_behavior(labyrinth_map, q_table, cur_node.index)
+        next_node = labyrinth_map[labyrinth_map[cur_node.index].neighbor_nodes[next_behavior]]
+        reward = 1 if next_node.is_treasure_node() else -1 if next_node.is_trap_node() else 0
         is_reach_end = next_node.is_terminal()
 
         if next_node.index not in q_table.index:
             q_table = q_table.append(pd.Series([0] * len(BehaviorsType), index=q_table.columns, name=next_node.index))
+
         q_predict_reward = q_table.loc[cur_node.index, next_behavior]
+        next_node_observe_behavior = choose_next_behavior(labyrinth_map, q_table, next_node.index)
 
         if is_reach_end:
             q_target_reward = reward
         else:
-            q_target_reward = reward + GAMMA * q_table.loc[next_node.index, :].max()
+            q_target_reward = reward + GAMMA * q_table.loc[next_node.index, next_node_observe_behavior]
+
         q_table.loc[cur_node.index, next_behavior] += ALPHA * (q_target_reward - q_predict_reward)
         node_list.append(next_node.index)
+        next_behavior = next_node_observe_behavior
         print('step {} node path {}'.format(len(node_list), node_list))
         print(q_table)
         print('-----step end-----')
+
     return q_table, node_list
 
 
-def reinforcement_q_learning_main():
+def reinforcement_sara_main():
     # 初始化地图
     labyrinth_map = setup_labyrinth_map()
     # 一开始只有自己的所在地块的q_table
@@ -169,10 +173,17 @@ def reinforcement_q_learning_main():
         q_table, node_list = process_explore_labyrinth(labyrinth_map, q_table)
         print(node_list)
         print(q_table)
-        explore_statics_dic[episode_index] = zip(node_list, q_table)
+        explore_statics_dic[episode_index] = [node_list, q_table]
         print('-------episode:{} end------------'.format(episode_index))
-    return q_table
+    return q_table, explore_statics_dic
+
+
+def calc_explore_statics(explore_statics_dic):
+    for index in sorted(explore_statics_dic):
+        node_list = explore_statics_dic[index][0]
+        print('[{}] - {}'.format(index, node_list))
 
 
 if __name__ == "__main__":
-    reinforcement_q_learning_main()
+    q_table_final, explore_statics_dic_final = reinforcement_sara_main()
+    calc_explore_statics(explore_statics_dic_final)
