@@ -58,13 +58,13 @@ class Map_Node:
 
 def setup_labyrinth_map():
     """
-    ○(0)  -   ○(1)  -   ○(2)  -   ○(3)
+    ○(0)  -   ○(1)  -   ○(2)  -   X(3)
       |         |          |         |
     ○(4)  -   ○(5)  -   ○(6)  -   ○(7)
       |         |          |         |
     ○(8)  -   ○(9)  -  X(10)  -  ○(11)
       |         |          |         |
-    X(12)  - X(13) -   ※(14)  -  ○(15)
+    ○(12)  - X(13) -   ※(14)  -  ○(15)
     :return:
     """
     map_array = np.array([(0, 0, 0, 0),
@@ -125,7 +125,8 @@ def choose_next_behavior(labyrinth_map, q_table, node):
     if random_choose:
         next_behavior = np.random.choice(options_dir)
     else:
-        options_act = [x for x in options_dir if state_behavior[x] == np.max(options_value)]
+        options_act = [x for x in options_dir if
+                       (np.isclose(state_behavior[x], np.max(options_value)))]
         next_behavior = np.random.choice(options_act)
     return next_behavior
 
